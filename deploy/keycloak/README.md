@@ -52,22 +52,36 @@ Overrides: `-KeycloakUrl`, `-Realm`, `-ClientId`, `-ClientSecret`,
 Decodes the access token and fails unless `alg=RS256`, `aud` contains
 `rust-control-plane`, and `tenant_id` matches.
 
-## End-to-end auth check
+## End-to-end auth and resolution check
 
 Requires `cargo build` first, because the server runs from the workspace
-`target/` directory.
+`target/` directory, and the local PostgreSQL container from `compose.yaml`.
 
 ```powershell
+# One-time: let Keycloak and the e2e container share the compose network.
+docker network connect agentic-platform_default keycloak 2>$null
+
+# Seed a membership whose issuer matches the name the container will use.
+./scripts/seed-dev.ps1 -Issuer http://keycloak:8080/realms/agentic-platform
+
 .\rust.ps1 cargo build --manifest-path /work/agentic-platform-structure-v1/Cargo.toml
 
-$kc = docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" keycloak
-docker run --rm -v "${PWD}/agentic-platform-structure-v1:/work" -w /work `
-  -e "KC_BASE=http://${kc}:8080" python:3.12-slim python scripts/e2e_auth_smoke.py
+docker run --rm --network agentic-platform_default `
+  -v "${PWD}/agentic-platform-structure-v1:/work" -w /work `
+  -e "KC_BASE=http://keycloak:8080" `
+  python:3.12-slim python scripts/e2e_auth_smoke.py
 ```
 
 The server and the client share the Docker network, so the issuer Keycloak mints
-matches `OIDC_ISSUER`. The check covers 401 without a token, 200 with a real
-token, tenant/audience/scope extraction, and rejection of a tampered token.
+matches `OIDC_ISSUER`. The check covers 401 without a token, identity shape from
+`/v1/me`, role and permission resolution from `/v1/session`, readiness, and
+rejection of a tampered token. `DATABASE_URL` defaults to
+`postgresql://agentic:REDACTED-IN-PUBLIC-HISTORY@postgres:5432/agentic`; override it when the
+container is named differently.
+
+Seed with the loopback issuer (`./scripts/seed-dev.ps1` with no `-Issuer`) when
+running the control plane on the host instead. Principals are keyed by
+`(issuer, subject)`, so the issuer must match exactly.
 
 ## Loopback caveat
 

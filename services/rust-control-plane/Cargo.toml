@@ -18,6 +18,8 @@ prost-types = "0.14"
 jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
 thiserror = "2.0.21"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+async-trait = "0.1.92"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "tls-rustls-ring"] }
 
 [build-dependencies]
 protoc-bin-vendored = "3"

@@ -17,6 +17,20 @@ pub struct AppConfig {
     pub bind_addr: SocketAddr,
     /// Identity provider settings used to authenticate callers.
     pub identity: IdentityConfig,
+    /// Durable authorization state.
+    pub database: DatabaseConfig,
+}
+
+/// PostgreSQL settings for memberships, roles and permission grants.
+#[derive(Debug, Clone)]
+pub struct DatabaseConfig {
+    /// Connection string.
+    pub url: String,
+    /// Upper bound on pooled connections.
+    pub max_connections: u32,
+    /// Apply embedded migrations at startup. Convenient in development; a
+    /// production deployment may prefer a separate migration step.
+    pub migrate_on_start: bool,
 }
 
 /// Settings for validating OIDC access tokens.
@@ -64,6 +78,34 @@ impl AppConfig {
         Ok(Self {
             bind_addr,
             identity: IdentityConfig::from_env()?,
+            database: DatabaseConfig::from_env()?,
+        })
+    }
+}
+
+impl DatabaseConfig {
+    /// Load PostgreSQL settings from the process environment.
+    pub fn from_env() -> Result<Self, ConfigError> {
+        let url = required("DATABASE_URL")?;
+        if !(url.starts_with("postgres://") || url.starts_with("postgresql://")) {
+            return Err(ConfigError::Invalid {
+                name: "DATABASE_URL",
+                reason: "must be a postgres:// or postgresql:// URL".into(),
+            });
+        }
+
+        let max_connections = optional("DATABASE_MAX_CONNECTIONS", "10")?
+            .parse::<u32>()
+            .map_err(|err| ConfigError::Invalid {
+                name: "DATABASE_MAX_CONNECTIONS",
+                reason: err.to_string(),
+            })?
+            .clamp(1, 200);
+
+        Ok(Self {
+            url,
+            max_connections,
+            migrate_on_start: boolean("DATABASE_MIGRATE", true)?,
         })
     }
 }
@@ -128,4 +170,16 @@ fn seconds(name: &'static str, default: u64) -> Result<Duration, ConfigError> {
         reason: err.to_string(),
     })?;
     Ok(Duration::from_secs(value))
+}
+
+fn boolean(name: &'static str, default: bool) -> Result<bool, ConfigError> {
+    let raw = optional(name, if default { "true" } else { "false" })?;
+    match raw.to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(true),
+        "0" | "false" | "no" | "off" => Ok(false),
+        _ => Err(ConfigError::Invalid {
+            name,
+            reason: "expected true/false".into(),
+        }),
+    }
 }

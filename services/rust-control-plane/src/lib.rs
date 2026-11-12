@@ -13,6 +13,7 @@ pub mod execution;
 pub mod observability;
 pub mod persistence;
 pub mod policy;
+pub mod principal;
 pub mod proto;
 pub mod runtime;
 pub mod state;
