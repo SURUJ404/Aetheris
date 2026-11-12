@@ -15,3 +15,4 @@ pub mod persistence;
 pub mod policy;
 pub mod proto;
 pub mod runtime;
+pub mod state;

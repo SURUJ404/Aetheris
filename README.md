@@ -35,9 +35,23 @@ working functionality until the audit and migration plan are approved.
 
 - Phase 0 (baseline audit and decision): complete. See `migration/ARCHITECTURE_GAP_ANALYSIS.md`.
 - Phase 1 (contracts and codegen): complete. See `migration/PHASE_1_REPORT.md`.
-- Phase 2 (Rust authority core): **in progress.** Identity foundation is
-  configured (Keycloak realm, OIDC client, `tenant_id` claim). Rust JWT
-  validation and tenant enforcement are **not implemented yet**.
+- Phase 2 (Rust authority core): **in progress.** Identity and authentication
+  slice is complete: provider-agnostic OIDC config, RS256/JWKS verification,
+  tenant extraction, and a protected `/v1/me`. See
+  `migration/PHASE_2_IDENTITY_REPORT.md`. Authorization policy, persistence and
+  the broker are **not implemented yet**.
+
+## Endpoints
+
+| Route | Auth | Purpose |
+|---|---|---|
+| `GET /health/live` | public | Process liveness |
+| `GET /health/ready` | public | Static readiness (no dependency checks yet) |
+| `GET /v1/me` | Bearer JWT | Returns the validated principal |
+
+`BIND_ADDR` defaults to `127.0.0.1:8081`. Opening another port requires the
+Keycloak client redirect URIs to be updated by re-running
+`deploy/keycloak/bootstrap.ps1`.
 
 ## Local identity
 

@@ -52,6 +52,23 @@ Overrides: `-KeycloakUrl`, `-Realm`, `-ClientId`, `-ClientSecret`,
 Decodes the access token and fails unless `alg=RS256`, `aud` contains
 `rust-control-plane`, and `tenant_id` matches.
 
+## End-to-end auth check
+
+Requires `cargo build` first, because the server runs from the workspace
+`target/` directory.
+
+```powershell
+.\rust.ps1 cargo build --manifest-path /work/agentic-platform-structure-v1/Cargo.toml
+
+$kc = docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" keycloak
+docker run --rm -v "${PWD}/agentic-platform-structure-v1:/work" -w /work `
+  -e "KC_BASE=http://${kc}:8080" python:3.12-slim python scripts/e2e_auth_smoke.py
+```
+
+The server and the client share the Docker network, so the issuer Keycloak mints
+matches `OIDC_ISSUER`. The check covers 401 without a token, 200 with a real
+token, tenant/audience/scope extraction, and rejection of a tampered token.
+
 ## Why 8081
 
 Keycloak owns `127.0.0.1:8080`. The control plane binds `BIND_ADDR`, default
