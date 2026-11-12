@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package agentic.v1;
+
+service CognitiveService {
+  // Rust sends bounded context and task metadata; Python returns a proposal.
+  rpc Plan(PlanRequest) returns (PlanResponse);
+  // Streaming is optional; choose one canonical token-stream contract later.
+  rpc StreamReasoning(PlanRequest) returns (stream ReasoningEvent);
+}
+
+message RequestContext {
+  string request_id = 1;
+  string task_id = 2;
+  string tenant_id = 3;
+  string actor_id = 4;
+  string traceparent = 5;
+}
+
+message PlanRequest {
+  RequestContext context = 1;
+  string user_input = 2;
+  string serialized_context = 3;
+  uint32 max_steps = 4;
+}
+
+message ProposedAction {
+  string step_id = 1;
+  string tool_name = 2;
+  string arguments_json = 3;
+  string rationale = 4;
+}
+
+message PlanResponse {
+  string task_id = 1;
+  repeated ProposedAction actions = 2;
+  string final_response = 3;
+  bool requires_human_review = 4;
+}
+
+message ReasoningEvent {
+  string task_id = 1;
+  string event_type = 2;
+  string payload = 3;
+}
