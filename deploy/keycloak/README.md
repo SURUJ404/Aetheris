@@ -69,6 +69,24 @@ The server and the client share the Docker network, so the issuer Keycloak mints
 matches `OIDC_ISSUER`. The check covers 401 without a token, 200 with a real
 token, tenant/audience/scope extraction, and rejection of a tampered token.
 
+## Loopback caveat
+
+`.env.example` uses `127.0.0.1:8080`, which is correct when the control plane
+runs on the host. `rust.ps1` runs cargo inside a container, where `127.0.0.1` is
+the container, not your machine. Keycloak also mints `iss` from the request
+host, so issuer, JWKS URI and token requests must all use the same name.
+
+Two supported options:
+
+1. **Run the server on the host** (production-style) and keep the
+   `.env.example` loopback values.
+2. **Run server and client in containers on Keycloak's network**, using
+   Keycloak's container IP for both issuance and verification. This is what
+   `scripts/e2e_auth_smoke.py` does automatically.
+
+Avoid mixing names (for example, fetching a token via `127.0.0.1` while
+configuring `host.docker.internal`); the `iss` check will reject it.
+
 ## Why 8081
 
 Keycloak owns `127.0.0.1:8080`. The control plane binds `BIND_ADDR`, default
