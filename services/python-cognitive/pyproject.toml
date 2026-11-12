@@ -3,8 +3,8 @@ name = "python-cognitive"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-  "grpcio>=1.60",
-  "protobuf>=4.25",
+  "grpcio>=1.74",
+  "protobuf>=5.29",
   "pydantic>=2.6",
   "langgraph>=0.2",
   "opentelemetry-api>=1.24",
@@ -12,4 +12,25 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.3", "mypy>=1.8"]
+dev = [
+  "grpcio-tools>=1.74",
+  "pytest>=8",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.3",
+  "mypy>=1.8"
+]
+
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+exclude = ["app/gen"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

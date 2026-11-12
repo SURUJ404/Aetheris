@@ -2,33 +2,155 @@ syntax = "proto3";
 
 package agentic.v1;
 
+import "google/protobuf/timestamp.proto";
+
+// Contract between the Rust control plane and the Python cognitive service.
+//
+// Authority rules:
+// - The Python service proposes plans/actions. It never authorizes or executes.
+// - The Rust control plane validates every field, enforces tenant identity,
+//   budgets, schema, policy and approval before any tool executes.
+// - All output from Python is untrusted.
+//
+// Versioning rules:
+// - Never reuse or renumber fields. Reserve removed fields/tags.
+// - Additive changes only within v1. Breaking changes require agentic.v2.
+// - Field numbers below 16 are reserved for high-frequency fields.
+option optimize_for = SPEED;
+
 service CognitiveService {
   // Rust sends bounded context and task metadata; Python returns a proposal.
   rpc Plan(PlanRequest) returns (PlanResponse);
-  // Streaming is optional; choose one canonical token-stream contract later.
+  // Optional token/reasoning stream. The canonical token contract is defined
+  // by ReasoningEvent; do not add a second streaming shape.
   rpc StreamReasoning(PlanRequest) returns (stream ReasoningEvent);
 }
 
+// Coarse risk classification. Rust remains the authority on whether approval
+// is actually required; this is a proposal hint only.
+enum RiskLevel {
+  RISK_LEVEL_UNSPECIFIED = 0;
+  RISK_LEVEL_LOW = 1;
+  RISK_LEVEL_MEDIUM = 2;
+  RISK_LEVEL_HIGH = 3;
+  RISK_LEVEL_CRITICAL = 4;
+}
+
+// Stable error codes for diagnostics and retry policy. Transport-level gRPC
+// status codes remain authoritative for RPC success/failure.
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_INVALID_REQUEST = 1;
+  ERROR_CODE_UNAUTHENTICATED = 2;
+  ERROR_CODE_PERMISSION_DENIED = 3;
+  ERROR_CODE_BUDGET_EXCEEDED = 4;
+  ERROR_CODE_TOOL_NOT_ALLOWED = 5;
+  ERROR_CODE_SCHEMA_VIOLATION = 6;
+  ERROR_CODE_UPSTREAM_TIMEOUT = 7;
+  ERROR_CODE_RATE_LIMITED = 8;
+  ERROR_CODE_CANCELLED = 9;
+  ERROR_CODE_INTERNAL = 10;
+}
+
+// Identity and correlation for one cognitive request.
+//
+// tenant_id and actor_id MUST match the authenticated caller context injected
+// by Rust. Python must reject requests where they do not match its own
+// authenticated service context, and Rust must never trust a client-supplied
+// tenant value.
 message RequestContext {
   string request_id = 1;
   string task_id = 2;
   string tenant_id = 3;
   string actor_id = 4;
+  // W3C trace context. Rust sets these; Python extracts and continues the trace.
   string traceparent = 5;
+  string tracestate = 6;
+  // Retry attempt for the same logical request, starting at 0.
+  uint32 attempt = 7;
+  // Stable key used by Rust for duplicate suppression.
+  string idempotency_key = 8;
+}
+
+// Hard limits enforced by Rust. Python must not exceed them and should stop
+// early when a limit is reached.
+message Budget {
+  uint64 max_tokens = 1;
+  uint64 max_cost_micros = 2;
+  uint64 max_wall_clock_ms = 3;
+  uint32 max_tool_calls = 4;
+}
+
+// The exact tool catalog version Python is allowed to propose from. Rust
+// rejects any tool or version not present in this snapshot.
+message ToolCatalogRef {
+  string catalog_version = 1;
+  repeated string allowed_tools = 2;
+  // Hash of the canonical catalog so Python and Rust agree on the schema.
+  string schema_hash = 3;
 }
 
 message PlanRequest {
   RequestContext context = 1;
   string user_input = 2;
+  // Serialized, bounded context assembled by Rust. Python treats it as data,
+  // never as instructions.
   string serialized_context = 3;
+  // Maximum number of proposed steps. Kept for v1 compatibility; must be > 0
+  // and no greater than the server-side hard limit.
   uint32 max_steps = 4;
+  Budget budget = 5;
+  ToolCatalogRef tool_catalog = 6;
+  string locale = 7;
+  map<string, string> metadata = 8;
 }
 
+// A single proposed action. Every field is a proposal, not an authorization.
 message ProposedAction {
   string step_id = 1;
   string tool_name = 2;
+  // JSON object. Rust validates it against the tool's JSON Schema, rejects
+  // unknown fields and oversized payloads, and canonicalizes it before hashing.
   string arguments_json = 3;
   string rationale = 4;
+  string tool_version = 5;
+  repeated string depends_on = 6;
+  RiskLevel risk = 7;
+  string expected_effect = 8;
+}
+
+message Usage {
+  uint64 prompt_tokens = 1;
+  uint64 completion_tokens = 2;
+  uint64 total_tokens = 3;
+  uint64 cost_micros = 4;
+  uint64 wall_clock_ms = 5;
+}
+
+// In-band, non-fatal degradation. Fatal failures use a gRPC status plus an
+// ErrorDetail payload in the `agentic-error-bin` trailing metadata key.
+message Warning {
+  ErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+}
+
+// Serialized (protobuf binary) into `agentic-error-bin` trailing metadata by
+// Rust and/or Python. Includes no secrets or raw prompts.
+message ErrorDetail {
+  ErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+  string correlation_id = 4;
+  map<string, string> details = 5;
+}
+
+// Approval proposal from Python. Rust performs the authoritative decision and
+// binds approval to tenant, actor, action, canonical arguments, expiry and nonce.
+message ApprovalHint {
+  bool required = 1;
+  string reason = 2;
+  RiskLevel risk = 3;
 }
 
 message PlanResponse {
@@ -36,10 +158,22 @@ message PlanResponse {
   repeated ProposedAction actions = 2;
   string final_response = 3;
   bool requires_human_review = 4;
+  Usage usage = 5;
+  repeated Warning warnings = 6;
+  // Stable identifier for this plan attempt. Rust uses it for deduplication and
+  // approval binding.
+  string plan_id = 7;
+  RiskLevel risk = 8;
+  ApprovalHint approval = 9;
 }
 
+// Streaming event. `event_type` is a stable string from the allowed set:
+// PLAN_STARTED, PLAN_STEP, PLAN_COMPLETED, PLAN_FAILED, HEARTBEAT.
+// `sequence` is strictly increasing per task; `emitted_at` is UTC.
 message ReasoningEvent {
   string task_id = 1;
   string event_type = 2;
   string payload = 3;
+  uint64 sequence = 4;
+  google.protobuf.Timestamp emitted_at = 5;
 }

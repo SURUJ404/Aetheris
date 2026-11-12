@@ -31,6 +31,30 @@ working functionality until the audit and migration plan are approved.
 8. Add Firecracker only when host infrastructure and threat model are ready.
 9. Add end-to-end tracing, evaluation, load tests, backup/restore and deployment hardening.
 
+## Phase status
+
+- Phase 0 (baseline audit and decision): complete. See `migration/ARCHITECTURE_GAP_ANALYSIS.md`.
+- Phase 1 (contracts and codegen): complete. See `migration/PHASE_1_REPORT.md`.
+- Phase 2 (Rust authority core): **not started; requires approval.**
+
+## Build and test
+
+Rust (run from the parent workspace so `rust.ps1` is available):
+
+```powershell
+.\rust.ps1 cargo test --manifest-path /work/agentic-platform-structure-v1/Cargo.toml --all-targets
+.\rust.ps1 --% cargo clippy --manifest-path /work/agentic-platform-structure-v1/Cargo.toml --all-targets -- -D warnings
+.\rust.ps1 cargo fmt --manifest-path /work/agentic-platform-structure-v1/Cargo.toml --all
+```
+
+Python bindings and tests (Docker, pinned Python):
+
+```powershell
+docker run --rm -v "$PWD:/work" -w /work python:3.12-slim bash -c "pip install -q grpcio-tools==1.74.0 pytest==8.3.4 && cd services/python-cognitive && python scripts/gen_proto.py && python -m pytest -q tests/test_proto_contract.py"
+```
+
+Contract rules and codegen details: `proto/README.md`.
+
 ## Do not do yet
 - Do not introduce Neo4j, Ray, Dagster, PyO3 or local inference until a measured need exists.
 - Do not expose Docker socket or host filesystem to agents.

@@ -1,14 +1,5 @@
-mod api;
-mod auth;
-mod broker;
-mod config;
-mod execution;
-mod observability;
-mod policy;
-mod persistence;
-mod runtime;
-
 use axum::{routing::get, Router};
+use rust_control_plane::{api, observability};
 use std::net::SocketAddr;
 
 #[tokio::main]
