@@ -35,7 +35,16 @@ working functionality until the audit and migration plan are approved.
 
 - Phase 0 (baseline audit and decision): complete. See `migration/ARCHITECTURE_GAP_ANALYSIS.md`.
 - Phase 1 (contracts and codegen): complete. See `migration/PHASE_1_REPORT.md`.
-- Phase 2 (Rust authority core): **not started; requires approval.**
+- Phase 2 (Rust authority core): **in progress.** Identity foundation is
+  configured (Keycloak realm, OIDC client, `tenant_id` claim). Rust JWT
+  validation and tenant enforcement are **not implemented yet**.
+
+## Local identity
+
+Keycloak runs on `127.0.0.1:8080`; the control plane defaults to
+`127.0.0.1:8081` (`BIND_ADDR`). Setup, verification and caveats:
+`deploy/keycloak/README.md`. Decision record:
+`migration/adr/0001-identity-provider.md`.
 
 ## Build and test
 
