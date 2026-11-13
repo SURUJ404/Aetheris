@@ -10,6 +10,7 @@
 use uuid::Uuid;
 
 use rust_control_plane::persistence::{PgStore, PrincipalStore};
+use rust_control_plane::policy::{Action, Permission};
 
 fn database_url() -> Option<String> {
     match std::env::var("TEST_DATABASE_URL") {
@@ -195,4 +196,49 @@ async fn ping_reports_a_live_database() {
     };
     let store = store(&url).await;
     store.ping().await.expect("ping");
+}
+
+#[tokio::test]
+async fn seeded_grants_cover_the_policy_vocabulary() {
+    let Some(url) = database_url() else {
+        return;
+    };
+    let store = store(&url).await;
+
+    // The owner role is the completeness guard: if a permission is added in
+    // code but not seeded, this fails instead of silently denying every caller.
+    let owner: Vec<String> =
+        sqlx::query_scalar("SELECT permission FROM role_permissions WHERE role = 'owner'")
+            .fetch_all(store.pool())
+            .await
+            .expect("query owner grants");
+
+    for action in Action::ALL {
+        let permission = action.required_permission().as_str();
+        assert!(
+            owner.iter().any(|granted| granted == permission),
+            "owner role does not grant {permission}"
+        );
+    }
+
+    // Every declared permission must be granted by at least one role, otherwise
+    // no principal can ever perform the corresponding action.
+    for permission in Permission::ALL {
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM role_permissions WHERE permission = $1")
+                .bind(permission.as_str())
+                .fetch_one(store.pool())
+                .await
+                .expect("count grants");
+        assert!(count > 0, "permission {permission} is not granted");
+    }
+
+    // The member role is the least-privilege guard for approval rights.
+    let member: Vec<String> =
+        sqlx::query_scalar("SELECT permission FROM role_permissions WHERE role = 'member'")
+            .fetch_all(store.pool())
+            .await
+            .expect("query member grants");
+    assert!(!member.iter().any(|granted| granted == "tool:approve"));
+    assert!(!member.iter().any(|granted| granted == "member:manage"));
 }

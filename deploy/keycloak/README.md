@@ -74,8 +74,8 @@ docker run --rm --network agentic-platform_default `
 
 The server and the client share the Docker network, so the issuer Keycloak mints
 matches `OIDC_ISSUER`. The check covers 401 without a token, identity shape from
-`/v1/me`, role and permission resolution from `/v1/session`, readiness, and
-rejection of a tampered token. `DATABASE_URL` defaults to
+`/v1/me`, role and permission resolution from `/v1/session`, a policy decision
+from `/v1/authorize`, readiness, and rejection of a tampered token. `DATABASE_URL` defaults to
 `postgresql://agentic:REDACTED-IN-PUBLIC-HISTORY@postgres:5432/agentic`; override it when the
 container is named differently.
 

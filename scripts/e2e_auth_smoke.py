@@ -2,7 +2,7 @@
 
 Runs inside a container on the same Docker network as Keycloak and PostgreSQL.
 Starts the compiled control plane, obtains a real token, and exercises
-/v1/me, /v1/session and /health/ready.
+/v1/me, /v1/session, /v1/authorize and /health/ready.
 
 Environment:
     KC_BASE       Base URL of Keycloak as seen from this container.
@@ -84,6 +84,24 @@ def get_json(path: str, token: str | None) -> tuple[int, dict | None, dict]:
         return error.code, json.loads(body) if body else None, dict(error.headers)
 
 
+def post_json(path: str, token: str | None, payload: dict) -> tuple[int, dict | None, dict]:
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(
+        f"{BASE}{path}",
+        data=json.dumps(payload).encode(),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status, json.load(response), dict(response.headers)
+    except urllib.error.HTTPError as error:
+        body = error.read()
+        return error.code, json.loads(body) if body else None, dict(error.headers)
+
+
 env = dict(
     os.environ,
     BIND_ADDR="127.0.0.1:8081",
@@ -139,6 +157,29 @@ try:
         str(session.get("permissions")),
     )
     check("principal id is a UUID", len(str(session.get("principal_id", ""))) == 36)
+
+    check(
+        "unauthenticated /v1/authorize is 401",
+        post_json("/v1/authorize", None, {"action": "tool.invoke"})[0] == 401,
+    )
+
+    status, decision, _ = post_json("/v1/authorize", token, {"action": "tool.invoke"})
+    check("allowed action is 200", status == 200, f"got {status}")
+    decision = decision or {}
+    check("allowed action reports the grant", decision.get("allowed") is True, str(decision))
+    check(
+        "decision names the required permission",
+        decision.get("permission") == "tool:invoke",
+        str(decision.get("permission")),
+    )
+
+    status, body, _ = post_json("/v1/authorize", token, {"action": "tool.delete"})
+    check("unknown action is 400", status == 400, f"got {status}")
+    check(
+        "unknown action is not a policy denial",
+        (body or {}).get("error") == "unsupported_action",
+        str((body or {}).get("error")),
+    )
 
     # A syntactically valid token with a broken signature must be rejected.
     header, payload, _ = token.split(".")

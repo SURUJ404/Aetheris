@@ -35,12 +35,13 @@ working functionality until the audit and migration plan are approved.
 
 - Phase 0 (baseline audit and decision): complete. See `migration/ARCHITECTURE_GAP_ANALYSIS.md`.
 - Phase 1 (contracts and codegen): complete. See `migration/PHASE_1_REPORT.md`.
-- Phase 2 (Rust authority core): **in progress.** Identity, authentication and
-  Postgres-backed principal resolution are complete: provider-agnostic OIDC
-  config, RS256/JWKS verification, tenant extraction, memberships and role
-  permissions, `/v1/me` and `/v1/session`. See
-  `migration/PHASE_2_IDENTITY_REPORT.md` and
-  `migration/PHASE_2_PRINCIPAL_RESOLUTION_REPORT.md`. Policy evaluation,
+- Phase 2 (Rust authority core): **in progress.** Identity, authentication,
+  Postgres-backed principal resolution and deterministic policy evaluation are
+  complete: provider-agnostic OIDC config, RS256/JWKS verification, tenant
+  extraction, memberships and role permissions, `/v1/me`, `/v1/session`, and
+  `/v1/authorize`. See `migration/PHASE_2_IDENTITY_REPORT.md`,
+  `migration/PHASE_2_PRINCIPAL_RESOLUTION_REPORT.md`, and
+  `migration/PHASE_2_AUTHORIZATION_POLICY_REPORT.md`. Budgets, approvals,
   membership administration, the broker and execution are **not implemented
   yet**.
 
@@ -52,6 +53,13 @@ working functionality until the audit and migration plan are approved.
 | `GET /health/ready` | public | Readiness; probes PostgreSQL |
 | `GET /v1/me` | Bearer JWT | Validated identity (no tenant or permissions) |
 | `GET /v1/session` | Bearer JWT + membership | Tenant, role and effective permissions |
+| `POST /v1/authorize` | Bearer JWT + membership | Allow/deny one action against the role's permissions |
+
+Policy is deny-by-default RBAC: an action is allowed only when the resolved
+membership role grants its exact permission. Unknown actions are a 400, not a
+deny. `/v1/authorize` is advisory; the future broker re-evaluates in-process
+before dispatch, so a 200 is not an execution token. See
+`migration/adr/0003-authorization-policy.md`.
 
 `BIND_ADDR` defaults to `127.0.0.1:8081`. Opening another port requires the
 Keycloak client redirect URIs to be updated by re-running

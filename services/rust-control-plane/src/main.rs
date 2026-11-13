@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use axum::{routing::get, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use rust_control_plane::{
     api, config::AppConfig, observability, persistence::PgStore, state::AppState,
 };
@@ -59,6 +62,7 @@ async fn main() {
         .route("/health/ready", get(api::health::ready))
         .route("/v1/me", get(api::identity::me))
         .route("/v1/session", get(api::identity::session))
+        .route("/v1/authorize", post(api::authorization::authorize))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(addr).await.expect("bind");
