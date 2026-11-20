@@ -15,11 +15,30 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 tonic-prost = "0.14"
 prost-types = "0.14"
-jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
+jsonwebtoken = { version = "12", features = ["rust_crypto"] }
 thiserror = "2.0.21"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 async-trait = "0.1.92"
-sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "tls-rustls-ring"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "tls-rustls-ring", "json", "chrono"] }
+# Core wasm + WASI preview1 only: no component model, no GC, no threads.
+# Trimming the default feature set keeps build time and the guest-visible
+# surface small; anything not enabled here cannot be linked by a guest.
+wasmtime = { version = "50.0.3", default-features = false, features = [
+    "std",
+    "runtime",
+    "cranelift",
+    "wat",
+    "anyhow",
+    "parallel-compilation",
+] }
+wasmtime-wasi = { version = "50.0.3", default-features = false, features = ["p1"] }
+sha2 = "0.11.1"
+tokio-util = { version = "0.7.20", features = ["rt"] }
+chrono = { version = "0.4.45", features = ["serde"] }
+opentelemetry = "0.27"
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+tracing-opentelemetry = "0.28"
+opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"] }
 
 [build-dependencies]
 protoc-bin-vendored = "3"

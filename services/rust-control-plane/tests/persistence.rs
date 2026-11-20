@@ -7,10 +7,15 @@
 //! Each test inserts its own tenant and principal and cleans up afterwards, so
 //! runs do not depend on ordering.
 
+use chrono::{Duration, Utc};
+use serde_json::json;
 use uuid::Uuid;
 
 use rust_control_plane::persistence::{PgStore, PrincipalStore};
-use rust_control_plane::policy::{Action, Permission};
+use rust_control_plane::policy::{Action, Permission, POLICY_VERSION};
+use rust_control_plane::task::{
+    canonical_approval_hash, ApprovalStatus, NewApproval, NewTask, TaskStatus, TaskStore,
+};
 
 fn database_url() -> Option<String> {
     match std::env::var("TEST_DATABASE_URL") {
@@ -241,4 +246,94 @@ async fn seeded_grants_cover_the_policy_vocabulary() {
             .expect("query member grants");
     assert!(!member.iter().any(|granted| granted == "tool:approve"));
     assert!(!member.iter().any(|granted| granted == "member:manage"));
+}
+
+#[tokio::test]
+async fn approval_lookup_and_single_use_consumption_are_tenant_scoped() {
+    let Some(url) = database_url() else {
+        return;
+    };
+    let store = store(&url).await;
+    let fixture = fixture(&store, "member").await;
+    let task_id = Uuid::new_v4();
+
+    store
+        .insert(NewTask {
+            id: task_id,
+            tenant_id: fixture.tenant_id.clone(),
+            principal_id: fixture.principal_id,
+            title: "approved run".into(),
+            input: "{}".into(),
+            policy_version: POLICY_VERSION.into(),
+            idempotency_key: None,
+            status: TaskStatus::WaitingApproval,
+        })
+        .await
+        .expect("insert task");
+    let (arguments_json, action_hash) =
+        canonical_approval_hash("echo", &json!({"stdin": "hello"})).expect("canonical hash");
+    let approval = store
+        .add_approval(NewApproval {
+            id: Uuid::new_v4(),
+            task_id,
+            tenant_id: fixture.tenant_id.clone(),
+            proposer_principal_id: fixture.principal_id,
+            tool_name: "echo".into(),
+            arguments_json,
+            action_hash,
+            policy_version: POLICY_VERSION.into(),
+            nonce: Uuid::new_v4(),
+            expires_at: Utc::now() + Duration::minutes(5),
+        })
+        .await
+        .expect("add approval");
+    store
+        .approve(
+            &fixture.tenant_id,
+            task_id,
+            approval.id,
+            Uuid::new_v4(),
+            Utc::now(),
+        )
+        .await
+        .expect("approve");
+
+    assert!(store
+        .get_approval(&fixture.tenant_id, task_id, approval.id)
+        .await
+        .expect("own approval lookup")
+        .is_some());
+    assert!(store
+        .get_approval("tenant-somewhere-else", task_id, approval.id)
+        .await
+        .expect("cross-tenant approval lookup")
+        .is_none());
+
+    let (consumed, running) = store
+        .consume_approval(
+            &fixture.tenant_id,
+            task_id,
+            approval.id,
+            Uuid::new_v4(),
+            Utc::now(),
+        )
+        .await
+        .expect("consume approval");
+    assert_eq!(consumed.status, ApprovalStatus::Consumed);
+    assert_eq!(running.status, TaskStatus::Running);
+
+    assert!(matches!(
+        store
+            .consume_approval(
+                &fixture.tenant_id,
+                task_id,
+                approval.id,
+                Uuid::new_v4(),
+                Utc::now(),
+            )
+            .await,
+        Err(rust_control_plane::task::TaskStoreError::ApprovalConsumed)
+    ));
+
+    cleanup(&store, &fixture).await;
 }

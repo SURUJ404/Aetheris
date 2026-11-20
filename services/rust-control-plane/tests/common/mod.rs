@@ -14,8 +14,13 @@ use jsonwebtoken::{encode, Algorithm, DecodingKey, EncodingKey, Header};
 use serde_json::{json, Value};
 
 use rust_control_plane::auth::{JwksCache, JwtVerifier};
-use rust_control_plane::config::{AppConfig, DatabaseConfig, IdentityConfig};
+use rust_control_plane::broker::Broker;
+use rust_control_plane::config::{
+    AppConfig, AppEnvironment, DatabaseConfig, ExecutionConfig, IdentityConfig,
+};
+use rust_control_plane::execution::MemoryExecutionStore;
 use rust_control_plane::persistence::{PrincipalStore, ResolvedPrincipal, StoreError};
+use rust_control_plane::runtime::{RuntimeRegistry, WorkloadRegistry};
 use rust_control_plane::state::AppState;
 
 pub const KID: &str = "test-key-1";
@@ -90,7 +95,9 @@ pub fn verifier() -> JwtVerifier {
 
 pub fn config() -> AppConfig {
     AppConfig {
+        environment: AppEnvironment::Development,
         bind_addr: "127.0.0.1:0".parse().expect("socket address"),
+        task_grpc_addr: "127.0.0.1:0".parse().expect("socket address"),
         identity: identity(),
         database: DatabaseConfig {
             // Tests never open this connection; the stub store replaces it.
@@ -98,11 +105,25 @@ pub fn config() -> AppConfig {
             max_connections: 1,
             migrate_on_start: false,
         },
+        execution: ExecutionConfig::default(),
     }
 }
 
+/// A broker backed by an in-memory execution store and no runtimes. Handler
+/// tests that do not touch `/v1/executions` still need a broker in state.
+pub fn test_broker(config: &AppConfig) -> Arc<Broker> {
+    Arc::new(Broker::new(
+        Arc::new(MemoryExecutionStore::new()),
+        RuntimeRegistry::default(),
+        WorkloadRegistry::default(),
+        config.execution.clone(),
+    ))
+}
+
 pub fn state_with_store(store: Arc<dyn PrincipalStore>) -> AppState {
-    AppState::with_parts(config(), verifier(), store)
+    let config = config();
+    let broker = test_broker(&config);
+    AppState::with_parts(config, verifier(), store, broker)
 }
 
 pub fn state() -> AppState {

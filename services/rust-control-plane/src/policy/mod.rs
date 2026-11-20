@@ -16,6 +16,14 @@ use std::fmt;
 
 use crate::principal::TenantContext;
 
+/// Version of the authorization vocabulary in force.
+///
+/// Every execution records this value, so an audit can distinguish decisions
+/// taken under different rule sets. Bump it whenever [`Permission`], [`Action`]
+/// or [`PolicyEngine::evaluate`] changes meaning; the string is part of the
+/// durable execution record and must never be reused for different semantics.
+pub const POLICY_VERSION: &str = "2026-11-19.rbac-v1";
+
 /// A capability a role can grant.
 ///
 /// Permissions are the stable vocabulary between role grants, policy, and the

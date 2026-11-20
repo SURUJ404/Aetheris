@@ -16,24 +16,36 @@
     never be used for anything reachable outside localhost.
 
 .EXAMPLE
+    $env:KC_ADMIN_PASSWORD = '<throwaway-admin-password>'
+    $env:KC_CLIENT_SECRET = '<throwaway-client-secret>'
+    $env:KC_DEV_PASSWORD = '<throwaway-user-password>'
     ./bootstrap.ps1
-    ./bootstrap.ps1 -Realm agentic-platform -ClientSecret 'something-else'
 #>
 [CmdletBinding()]
 param(
     [string] $KeycloakUrl = $(if ($env:KC_URL) { $env:KC_URL } else { 'http://127.0.0.1:8080' }),
     [string] $AdminRealm = 'master',
     [string] $AdminUser = $(if ($env:KC_ADMIN_USER) { $env:KC_ADMIN_USER } else { 'admin' }),
-    [string] $AdminPassword = $(if ($env:KC_ADMIN_PASSWORD) { $env:KC_ADMIN_PASSWORD } else { 'REDACTED-IN-PUBLIC-HISTORY' }),
+    [string] $AdminPassword = $env:KC_ADMIN_PASSWORD,
     [string] $Realm = 'agentic-platform',
     [string] $ClientId = 'rust-control-plane',
-    [string] $ClientSecret = $(if ($env:KC_CLIENT_SECRET) { $env:KC_CLIENT_SECRET } else { 'REDACTED-IN-PUBLIC-HISTORY' }),
-    [string] $DevUsername = 'dev-user',
-    [string] $DevPassword = 'REDACTED-IN-PUBLIC-HISTORY',
+    [string] $ClientSecret = $env:KC_CLIENT_SECRET,
+    [string] $DevUsername = $(if ($env:KC_DEV_USERNAME) { $env:KC_DEV_USERNAME } else { 'dev-user' }),
+    [string] $DevPassword = $env:KC_DEV_PASSWORD,
     [string] $DevTenantId = 'tenant-acme'
 )
 
 $ErrorActionPreference = 'Stop'
+
+foreach ($required in @(
+    @{ Name = 'KC_ADMIN_PASSWORD'; Value = $AdminPassword },
+    @{ Name = 'KC_CLIENT_SECRET'; Value = $ClientSecret },
+    @{ Name = 'KC_DEV_PASSWORD'; Value = $DevPassword }
+)) {
+    if (-not $required.Value) {
+        throw "$($required.Name) must be set to a throwaway local development value."
+    }
+}
 
 function Get-AdminToken {
     $body = @{

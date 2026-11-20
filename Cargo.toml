@@ -1,3 +1,13 @@
 [workspace]
 resolver = "2"
 members = ["services/rust-control-plane"]
+
+[profile.release]
+# Release hardening for distributed binaries. This improves stripping and
+# inlining (raising the cost of casual reverse engineering) without relying
+# on packers/obfuscators; the source remains public by design.
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
+opt-level = "s"

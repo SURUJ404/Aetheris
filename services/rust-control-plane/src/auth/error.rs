@@ -31,6 +31,12 @@ pub enum AuthError {
     #[error("token is not valid yet")]
     NotYetValid,
 
+    /// An OIDC ID token proves interactive authentication to a client; it is
+    /// not a bearer credential for this API. Accepting one would let a client
+    /// present its login proof as an API access token.
+    #[error("ID tokens are not accepted as API access tokens")]
+    IdTokenRejected,
+
     #[error("token issuer is not trusted")]
     InvalidIssuer,
 

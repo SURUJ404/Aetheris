@@ -5,9 +5,14 @@ Starts the compiled control plane, obtains a real token, and exercises
 /v1/me, /v1/session, /v1/authorize and /health/ready.
 
 Environment:
-    KC_BASE       Base URL of Keycloak as seen from this container.
-    DATABASE_URL  PostgreSQL URL as seen from this container. Defaults to the
-                  compose service name.
+    KC_BASE           Base URL of Keycloak as seen from this container.
+    DATABASE_URL      PostgreSQL URL as seen from this container.
+    KC_CLIENT_SECRET  Throwaway client secret for the local dev realm.
+    KC_DEV_USERNAME   Local dev username.
+    KC_DEV_PASSWORD   Password for KC_DEV_USERNAME.
+
+All URLs are operator-supplied loopback or Docker service names; no untrusted
+input reaches urllib. The ``nosemgrep`` annotations below document that review.
 
 Prerequisite: seed a membership with an issuer that matches KC_BASE, e.g.
     ./scripts/seed-dev.ps1 -KeycloakUrl http://keycloak:8080 `
@@ -27,9 +32,10 @@ KC_BASE = os.environ["KC_BASE"].rstrip("/")
 ISSUER = f"{KC_BASE}/realms/agentic-platform"
 JWKS = f"{ISSUER}/protocol/openid-connect/certs"
 BASE = "http://127.0.0.1:8081"
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL", "postgresql://agentic:REDACTED-IN-PUBLIC-HISTORY@postgres:5432/agentic"
-)
+DATABASE_URL = os.environ["DATABASE_URL"]
+KC_CLIENT_SECRET = os.environ["KC_CLIENT_SECRET"]
+KC_DEV_USERNAME = os.environ["KC_DEV_USERNAME"]
+KC_DEV_PASSWORD = os.environ["KC_DEV_PASSWORD"]
 
 failures: list[str] = []
 
@@ -45,7 +51,7 @@ def wait_for_ready(timeout: float = 60.0) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            with urllib.request.urlopen(f"{BASE}/health/ready", timeout=1) as response:
+            with urllib.request.urlopen(f"{BASE}/health/ready", timeout=1) as response:  # nosemgrep
                 if response.status == 200:
                     return
         except Exception:
@@ -58,9 +64,9 @@ def fetch_token() -> str:
         {
             "grant_type": "password",
             "client_id": "rust-control-plane",
-            "client_secret": "REDACTED-IN-PUBLIC-HISTORY",
-            "username": "dev-user",
-            "password": "REDACTED-IN-PUBLIC-HISTORY",
+            "client_secret": KC_CLIENT_SECRET,
+            "username": KC_DEV_USERNAME,
+            "password": KC_DEV_PASSWORD,
             "scope": "openid",
         }
     ).encode()
@@ -69,7 +75,7 @@ def fetch_token() -> str:
         data=body,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
-    with urllib.request.urlopen(request, timeout=15) as response:
+    with urllib.request.urlopen(request, timeout=15) as response:  # nosemgrep
         return json.load(response)["access_token"]
 
 
@@ -77,7 +83,7 @@ def get_json(path: str, token: str | None) -> tuple[int, dict | None, dict]:
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     request = urllib.request.Request(f"{BASE}{path}", headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=10) as response:
+        with urllib.request.urlopen(request, timeout=10) as response:  # nosemgrep
             return response.status, json.load(response), dict(response.headers)
     except urllib.error.HTTPError as error:
         body = error.read()
@@ -95,7 +101,7 @@ def post_json(path: str, token: str | None, payload: dict) -> tuple[int, dict | 
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=10) as response:
+        with urllib.request.urlopen(request, timeout=10) as response:  # nosemgrep
             return response.status, json.load(response), dict(response.headers)
     except urllib.error.HTTPError as error:
         body = error.read()
@@ -111,6 +117,10 @@ env = dict(
     OIDC_TENANT_CLAIM="tenant_id",
     DATABASE_URL=DATABASE_URL,
     DATABASE_MIGRATE="true",
+    # The binary runs with /work as its cwd. The approved workload registry lives
+    # inside the Rust crate, not at the repository root. An absolute path keeps
+    # startup independent of the caller's working directory.
+    EXECUTION_WORKLOAD_DIR="/work/services/rust-control-plane/workloads",
     RUST_LOG="warn",
 )
 

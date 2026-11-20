@@ -1,0 +1,89 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Forks and pull requests never receive write permissions or repository secrets.
+permissions: read-all
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # First-time contributors are held at the protected
+  # `first-time-contributors` environment; all other runs use the unprotected
+  # `ci` environment. Both environments are documented in the release checklist.
+  lint-and-test:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'pull_request' && github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' && 'first-time-contributors' || 'ci' }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build CI image
+        run: docker build -f Dockerfile.ci -t agentic-ci .
+
+      - name: Rust format, lint and tests
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src agentic-ci sh -ec '
+            cargo fmt --all -- --check
+            cargo clippy --all --workspace --all-targets -- -D warnings
+            cargo test --all-targets
+          '
+
+      - name: Python lint and tests
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src/services/python-cognitive python:3.12-slim sh -ec '
+            pip install --no-cache-dir -e ".[dev]"
+            ruff check . --ignore EXE002
+            pytest -q
+          '
+
+      - name: Compose config validation
+        env:
+          POSTGRES_PASSWORD: ci-placeholder-not-a-secret
+        run: docker compose config --quiet
+
+  dependency-and-secret-scan:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'pull_request' && github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' && 'first-time-contributors' || 'ci' }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Gitleaks (working tree)
+        run: |
+          docker run --rm -v "$PWD:/src" -v "$RUNNER_TEMP:/reports" -w /src \
+            zricethezav/gitleaks:latest detect \
+            --source /src --config /src/.gitleaks.toml --no-git --redact \
+            --report-format json --report-path /reports/gitleaks-wt.json
+
+      - name: Gitleaks (full history)
+        run: |
+          docker run --rm -v "$PWD:/src" -v "$RUNNER_TEMP:/reports" -w /src \
+            zricethezav/gitleaks:latest detect \
+            --source /src --config /src/.gitleaks.toml --redact \
+            --report-format json --report-path /reports/gitleaks-history.json
+
+      - name: Cargo audit
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src rust:1 sh -ec '
+            cargo install cargo-audit --locked
+            cargo audit
+          '
+
+      - name: Semgrep SAST
+        run: |
+          docker run --rm -v "$PWD:/src" -v "$RUNNER_TEMP:/reports" -w /src \
+            semgrep/semgrep:latest semgrep scan \
+            --config p/default --metrics=off --error \
+            --json --output /reports/semgrep.json

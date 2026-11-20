@@ -1,0 +1,23 @@
+title = "agentic-platform gitleaks configuration"
+
+[extend]
+useDefault = true
+
+# Global allowlist. Build artefacts are never source files, and the listed test
+# files contain deliberate throwaway PEM/API-key fixtures used by unit tests.
+# They are not production credentials and are rotated with the test suite.
+[allowlist]
+description = "Generated artefacts and known test-only fixtures"
+paths = [
+  '''(^|/)target/''',
+  '''(^|/)\.git/''',
+  '''(^|/)__pycache__/''',
+  '''\.pyc$''',
+  '''(^|/)\.ruff_cache/''',
+  '''(^|/)\.pytest_cache/''',
+  '''(^|/)\.mypy_cache/''',
+  '''(^|/)\.venv/''',
+  '''(^|/)venv/''',
+  '''services/rust-control-plane/tests/(common/mod|auth)\.rs$''',
+  '''services/python-cognitive/tests/test_cognitive_service\.py$''',
+]

@@ -3,6 +3,12 @@ name: agentic-platform
 # Local development dependencies. Keycloak is intentionally not included yet:
 # it is already running separately and will move here when it gets a durable
 # database.
+#
+# Deliberately absent: any sandbox service or Docker socket mount. Sandboxed
+# execution runs in-process in the Rust control plane (Wasmtime) or as a
+# Firecracker microVM on a Linux/KVM host, never as a privileged sibling
+# container. Adding a `docker.sock` mount here would void the execution
+# boundary; see ARCHITECTURE.md.
 services:
   postgres:
     image: postgres:16-alpine
@@ -10,7 +16,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-agentic}
       POSTGRES_USER: ${POSTGRES_USER:-agentic}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-REDACTED-IN-PUBLIC-HISTORY}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set for local development}
     ports:
       # 5432 is commonly occupied by a host Postgres; 55432 keeps them apart.
       - "127.0.0.1:55432:5432"
@@ -25,5 +31,30 @@ services:
       retries: 20
       start_period: 5s
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.98.0
+    container_name: agentic-otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      GRAFANA_CLOUD_OTLP_ENDPOINT: ${GRAFANA_CLOUD_OTLP_ENDPOINT:-}
+      GRAFANA_CLOUD_INSTANCE_ID: ${GRAFANA_CLOUD_INSTANCE_ID:-}
+      GRAFANA_CLOUD_API_KEY: ${GRAFANA_CLOUD_API_KEY:-}
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:8888:8888"
+    volumes:
+      - ./deploy/observability/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+  qdrant:
+    image: qdrant/qdrant:v1.10.1
+    container_name: agentic-qdrant
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
 volumes:
   postgres-data:
+  qdrant-data:

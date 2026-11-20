@@ -1,6 +1,9 @@
 //! Durable state. PostgreSQL is the source of truth for memberships, roles and
 //! permission grants; Redis will only ever hold derived, disposable data.
 
+mod execution;
+mod task;
+
 use std::time::Duration;
 
 use async_trait::async_trait;

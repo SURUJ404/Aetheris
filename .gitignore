@@ -13,3 +13,10 @@ dist/
 .DS_Store
 logs/
 artifacts/
+
+# Internal QA/phase-report docs and generated tool skills are not for release.
+/docs/QA_STEPS_1_TO_4.md
+/migration/ARCHITECTURE_GAP_ANALYSIS.md
+/migration/PHASE_*.md
+/migration/REPOSITORY_MAP.md
+.opencode/skills/

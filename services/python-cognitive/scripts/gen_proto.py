@@ -22,7 +22,7 @@ from grpc_tools import protoc
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = SERVICE_ROOT.parents[1]
 PROTO_ROOT = REPO_ROOT / "proto"
-PROTO_FILE = PROTO_ROOT / "agentic" / "v1" / "cognitive.proto"
+PROTO_FILES = sorted((PROTO_ROOT / "agentic" / "v1").glob("*.proto"))
 OUT_DIR = SERVICE_ROOT / "app" / "gen"
 
 
@@ -56,8 +56,8 @@ def _make_grpc_imports_relative() -> None:
 
 
 def main() -> int:
-    if not PROTO_FILE.is_file():
-        raise SystemExit(f"proto not found: {PROTO_FILE}")
+    if not PROTO_FILES:
+        raise SystemExit(f"no proto files found in {PROTO_ROOT / 'agentic' / 'v1'}")
 
     _write_namespace_packages()
 
@@ -68,7 +68,7 @@ def main() -> int:
         f"-I{include_dir}",
         f"--python_out={OUT_DIR}",
         f"--grpc_python_out={OUT_DIR}",
-        str(PROTO_FILE),
+        *(str(path) for path in PROTO_FILES),
     ]
     result = protoc.main(args)
     if result == 0:

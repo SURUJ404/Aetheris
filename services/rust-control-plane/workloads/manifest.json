@@ -1,0 +1,19 @@
+{
+  "workloads": [
+    {
+      "name": "byte-sum",
+      "path": "byte-sum.wat",
+      "sha256": "c25de076ab203fc647e773740ab43bd8d2e6b4c560077a645068909c9ee0c6b4"
+    },
+    {
+      "name": "echo",
+      "path": "echo.wat",
+      "sha256": "4b0d5b4f4c2ced3ec4cc4346c5c0720a8de150d56afc190a0e2292b825420d35"
+    },
+    {
+      "name": "uppercase",
+      "path": "uppercase.wat",
+      "sha256": "b36e577d3cc40f94c87976fdb625229884d5b75441c1d4415d85c9d1adef8d8e"
+    }
+  ]
+}

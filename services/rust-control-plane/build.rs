@@ -14,16 +14,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR")?);
     let proto_root = manifest_dir.join("../../proto");
-    let proto = proto_root.join("agentic/v1/cognitive.proto");
+    let cognitive_proto = proto_root.join("agentic/v1/cognitive.proto");
+    let task_proto = proto_root.join("agentic/v1/task_service.proto");
 
-    println!("cargo:rerun-if-changed={}", proto.display());
+    println!("cargo:rerun-if-changed={}", cognitive_proto.display());
+    println!("cargo:rerun-if-changed={}", task_proto.display());
 
     let includes = [proto_root, protoc_bin_vendored::include_path()?];
 
     tonic_prost_build::configure()
         .build_client(true)
         .build_server(true)
-        .compile_protos(&[proto], &includes)?;
+        .compile_protos(&[cognitive_proto, task_proto], &includes)?;
 
     Ok(())
 }

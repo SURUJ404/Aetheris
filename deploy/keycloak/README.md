@@ -9,10 +9,11 @@ recorded in `migration/adr/0001-identity-provider.md`.
 ## Start
 
 ```powershell
+$env:KC_ADMIN_PASSWORD = '<throwaway-admin-password>'
 docker run -d --name keycloak `
   -p 127.0.0.1:8080:8080 `
   -e KC_BOOTSTRAP_ADMIN_USERNAME=admin `
-  -e 'KC_BOOTSTRAP_ADMIN_PASSWORD=REDACTED-IN-PUBLIC-HISTORY' `
+  -e "KC_BOOTSTRAP_ADMIN_PASSWORD=$env:KC_ADMIN_PASSWORD" `
   quay.io/keycloak/keycloak:26.8.2 start-dev
 ```
 
@@ -24,6 +25,8 @@ Idempotent. Creates the client, audience mapper, `tenant_id` claim mapper, and a
 development user.
 
 ```powershell
+$env:KC_CLIENT_SECRET = '<throwaway-client-secret>'
+$env:KC_DEV_PASSWORD = '<throwaway-user-password>'
 ./deploy/keycloak/bootstrap.ps1
 ```
 
@@ -36,12 +39,13 @@ Result:
 | Client | `rust-control-plane` (confidential, PKCE S256) |
 | Audience | `rust-control-plane` |
 | Tenant claim | `tenant_id` (user attribute) |
-| Dev user | `dev-user` / `REDACTED-IN-PUBLIC-HISTORY` with `tenant_id=tenant-acme` |
+| Dev user | `$env:KC_DEV_USERNAME` (default `dev-user`) with `tenant_id=tenant-acme` |
 | Redirect URIs | `http://127.0.0.1:8081/*`, `http://localhost:8081/*` |
 
-Overrides: `-KeycloakUrl`, `-Realm`, `-ClientId`, `-ClientSecret`,
-`-DevUsername`, `-DevPassword`, `-DevTenantId`. Admin credentials come from
-`KC_ADMIN_USER` / `KC_ADMIN_PASSWORD` when set.
+Secrets are supplied through environment variables: `KC_ADMIN_PASSWORD`,
+`KC_CLIENT_SECRET`, and `KC_DEV_PASSWORD`. Non-secret overrides are
+`-KeycloakUrl`, `-Realm`, `-ClientId`, `-DevUsername`, `-DevTenantId`, and
+`KC_ADMIN_USER`.
 
 ## Verify a token
 
@@ -50,7 +54,8 @@ Overrides: `-KeycloakUrl`, `-Realm`, `-ClientId`, `-ClientSecret`,
 ```
 
 Decodes the access token and fails unless `alg=RS256`, `aud` contains
-`rust-control-plane`, and `tenant_id` matches.
+`rust-control-plane`, and `tenant_id` matches. It reads `KC_CLIENT_SECRET` and
+`KC_DEV_PASSWORD` from the environment.
 
 ## End-to-end auth and resolution check
 
@@ -66,18 +71,23 @@ docker network connect agentic-platform_default keycloak 2>$null
 
 .\rust.ps1 cargo build --manifest-path /work/agentic-platform-structure-v1/Cargo.toml
 
+$env:DATABASE_URL = 'postgresql://agentic:<local-dev-password>@postgres:5432/agentic'
 docker run --rm --network agentic-platform_default `
   -v "${PWD}/agentic-platform-structure-v1:/work" -w /work `
   -e "KC_BASE=http://keycloak:8080" `
+  -e DATABASE_URL `
+  -e "KC_CLIENT_SECRET=$env:KC_CLIENT_SECRET" `
+  -e "KC_DEV_USERNAME=$env:KC_DEV_USERNAME" `
+  -e "KC_DEV_PASSWORD=$env:KC_DEV_PASSWORD" `
   python:3.12-slim python scripts/e2e_auth_smoke.py
 ```
 
 The server and the client share the Docker network, so the issuer Keycloak mints
 matches `OIDC_ISSUER`. The check covers 401 without a token, identity shape from
 `/v1/me`, role and permission resolution from `/v1/session`, a policy decision
-from `/v1/authorize`, readiness, and rejection of a tampered token. `DATABASE_URL` defaults to
-`postgresql://agentic:REDACTED-IN-PUBLIC-HISTORY@postgres:5432/agentic`; override it when the
-container is named differently.
+from `/v1/authorize`, readiness, and rejection of a tampered token.
+`DATABASE_URL`, `KC_CLIENT_SECRET`, `KC_DEV_USERNAME`, and `KC_DEV_PASSWORD`
+are required; supply them with the values you generated for local development.
 
 Seed with the loopback issuer (`./scripts/seed-dev.ps1` with no `-Issuer`) when
 running the control plane on the host instead. Principals are keyed by

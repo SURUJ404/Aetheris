@@ -20,6 +20,9 @@ option optimize_for = SPEED;
 
 service CognitiveService {
   // Rust sends bounded context and task metadata; Python returns a proposal.
+  // Internal authentication is carried in gRPC metadata by the deployment
+  // boundary (for example: authorization: Bearer <service-token>). The
+  // metadata is transport authentication, not task authorization.
   rpc Plan(PlanRequest) returns (PlanResponse);
   // Optional token/reasoning stream. The canonical token contract is defined
   // by ReasoningEvent; do not add a second streaming shape.
@@ -70,6 +73,9 @@ message RequestContext {
   uint32 attempt = 7;
   // Stable key used by Rust for duplicate suppression.
   string idempotency_key = 8;
+  // Policy snapshot selected by Rust for this proposal. Python treats this as
+  // immutable context and must echo no authority from model output.
+  string policy_version = 9;
 }
 
 // Hard limits enforced by Rust. Python must not exceed them and should stop

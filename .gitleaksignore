@@ -1,0 +1,7 @@
+# Gitleaks baseline fingerprints for historical test-only fixtures.
+# These are deliberate throwaway values in unit tests, not live credentials.
+3da76262f003f1b13e0c4353a65589be0e4b1396:agentic-platform-structure-v1/services/rust-control-plane/tests/common/mod.rs:private-key:32
+0d6aced8916db57c29494bb2ab9f9b44c28c4bb3:agentic-platform-structure-v1/services/python-cognitive/tests/test_cognitive_service.py:generic-api-key:36
+39a8dcea491cf41547adfce88be58626615ff3cf:agentic-platform-structure-v1/services/rust-control-plane/tests/common/mod.rs:private-key:30
+5ad634c5115530773301936af404af94d3f3dc3c:agentic-platform-structure-v1/services/rust-control-plane/tests/common/mod.rs:private-key:27
+7d6227e029894bb858c7c6c855bf55d4b6a62887:agentic-platform-structure-v1/services/rust-control-plane/tests/auth.rs:private-key:22

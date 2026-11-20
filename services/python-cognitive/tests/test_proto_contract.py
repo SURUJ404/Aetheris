@@ -18,6 +18,7 @@ def test_request_context_and_budget_fields() -> None:
     assert context["tenant_id"].number == 3
     assert context["traceparent"].number == 5
     assert context["idempotency_key"].number == 8
+    assert context["policy_version"].number == 9
 
     budget = cognitive_pb2.Budget.DESCRIPTOR.fields_by_name
     assert budget["max_tokens"].number == 1
@@ -35,6 +36,7 @@ def test_plan_request_roundtrip() -> None:
             actor_id="actor-1",
             traceparent="00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
             idempotency_key="idem-1",
+            policy_version="2026-11-19.rbac-v1",
         ),
         user_input="Summarize the incident",
         max_steps=8,

@@ -18,13 +18,17 @@ param(
     [string] $KeycloakUrl = $(if ($env:KC_URL) { $env:KC_URL } else { 'http://127.0.0.1:8080' }),
     [string] $Realm = 'agentic-platform',
     [string] $ClientId = 'rust-control-plane',
-    [string] $ClientSecret = $(if ($env:KC_CLIENT_SECRET) { $env:KC_CLIENT_SECRET } else { 'REDACTED-IN-PUBLIC-HISTORY' }),
-    [string] $Username = 'dev-user',
-    [string] $Password = 'REDACTED-IN-PUBLIC-HISTORY',
+    [string] $ClientSecret = $env:KC_CLIENT_SECRET,
+    [string] $Username = $(if ($env:KC_DEV_USERNAME) { $env:KC_DEV_USERNAME } else { 'dev-user' }),
+    [string] $Password = $env:KC_DEV_PASSWORD,
     [string] $ExpectedTenantId = 'tenant-acme'
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $ClientSecret -or -not $Password) {
+    throw 'Set KC_CLIENT_SECRET and KC_DEV_PASSWORD to the throwaway values used by bootstrap.ps1.'
+}
 
 function ConvertFrom-Base64Url {
     param([string] $Value)

@@ -29,7 +29,7 @@ param(
     [string] $KeycloakUrl = $(if ($env:KC_URL) { $env:KC_URL } else { 'http://127.0.0.1:8080' }),
     [string] $AdminRealm = 'master',
     [string] $AdminUser = $(if ($env:KC_ADMIN_USER) { $env:KC_ADMIN_USER } else { 'admin' }),
-    [string] $AdminPassword = $(if ($env:KC_ADMIN_PASSWORD) { $env:KC_ADMIN_PASSWORD } else { 'REDACTED-IN-PUBLIC-HISTORY' }),
+    [string] $AdminPassword = $env:KC_ADMIN_PASSWORD,
     [string] $Realm = 'agentic-platform',
     [string] $Username = 'dev-user',
     [string] $Issuer = '',
@@ -43,6 +43,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $AdminPassword) {
+    throw 'Set KC_ADMIN_PASSWORD to the throwaway local Keycloak admin password.'
+}
 
 if (-not $Issuer) {
     $Issuer = "$KeycloakUrl/realms/$Realm"

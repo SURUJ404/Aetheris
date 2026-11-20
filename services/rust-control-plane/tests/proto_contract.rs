@@ -20,6 +20,7 @@ fn sample_request() -> PlanRequest {
             tracestate: "vendor=value".into(),
             attempt: 2,
             idempotency_key: "idem-1".into(),
+            policy_version: "2026-11-19.rbac-v1".into(),
         }),
         user_input: "Summarize the incident".into(),
         serialized_context: r#"{"documents":[]}"#.into(),

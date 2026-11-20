@@ -7,6 +7,7 @@ dependencies = [
   "protobuf>=5.29",
   "pydantic>=2.6",
   "langgraph>=0.2",
+  "qdrant-client>=1.10,<1.12",
   "opentelemetry-api>=1.24",
   "opentelemetry-sdk>=1.24"
 ]
@@ -34,3 +35,4 @@ exclude = ["app/gen"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+asyncio_default_fixture_loop_scope = "function"

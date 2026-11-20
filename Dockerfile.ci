@@ -1,0 +1,5 @@
+FROM rust:1
+
+RUN rustup component add rustfmt clippy
+
+WORKDIR /src

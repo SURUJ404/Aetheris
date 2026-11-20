@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-11-12
 - Deciders: platform owner
-- Related: `migration/ARCHITECTURE_GAP_ANALYSIS.md`, `proto/agentic/v1/cognitive.proto`
+- Related: `ARCHITECTURE.md`, `proto/agentic/v1/cognitive.proto`
 
 ## Context
 

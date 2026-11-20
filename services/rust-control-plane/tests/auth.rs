@@ -100,6 +100,40 @@ async fn empty_tenant_claim_is_rejected() {
 }
 
 #[tokio::test]
+async fn id_tokens_are_rejected_as_api_credentials() {
+    let mut id_token = claims();
+    id_token["typ"] = json!("ID");
+
+    assert!(matches!(
+        verifier().verify(&sign(&id_token)).await,
+        Err(AuthError::IdTokenRejected)
+    ));
+}
+
+#[tokio::test]
+async fn tokens_with_an_oidc_nonce_are_rejected() {
+    let mut id_token = claims();
+    id_token["nonce"] = json!("n-123456789");
+
+    assert!(matches!(
+        verifier().verify(&sign(&id_token)).await,
+        Err(AuthError::IdTokenRejected)
+    ));
+}
+
+#[tokio::test]
+async fn access_token_types_remain_valid() {
+    for token_type in ["Bearer", "at+jwt", "JWT"] {
+        let mut access = claims();
+        access["typ"] = json!(token_type);
+        verifier()
+            .verify(&sign(&access))
+            .await
+            .unwrap_or_else(|error| panic!("{token_type} should be accepted: {error}"));
+    }
+}
+
+#[tokio::test]
 async fn unknown_key_id_is_rejected() {
     assert!(matches!(
         verifier()
@@ -116,7 +150,7 @@ async fn non_rs256_tokens_are_rejected() {
     let token = encode(
         &header,
         &claims(),
-        &EncodingKey::from_secret(b"not-the-signing-key"),
+        &EncodingKey::from_secret(b"not-the-signing-key").expect("test encoding key"),
     )
     .expect("sign");
 

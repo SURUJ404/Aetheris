@@ -51,6 +51,21 @@ impl JwtVerifier {
         let data = decode::<RawClaims>(token, &key, &self.validation).map_err(map_jwt_error)?;
         let claims = data.claims;
 
+        // An ID token is a client authentication artifact, not an API bearer
+        // credential. Providers mark it with `typ: ID` and, for OIDC flows, a
+        // `nonce` bound to the client's authentication request. Reject both;
+        // a valid access token from Keycloak carries `typ: Bearer` and no nonce.
+        // Checking this after signature validation keeps the rejection from
+        // becoming an oracle for unsigned token contents.
+        if claims
+            .typ
+            .as_deref()
+            .is_some_and(|typ| typ.eq_ignore_ascii_case("ID"))
+            || claims.nonce.is_some()
+        {
+            return Err(AuthError::IdTokenRejected);
+        }
+
         let tenant_id = claims
             .extra
             .get(&self.config.tenant_claim)
@@ -87,6 +102,13 @@ struct RawClaims {
     jti: Option<String>,
     #[serde(default)]
     scope: Option<String>,
+    /// Provider token type. Keycloak access tokens use `Bearer`; ID tokens use
+    /// `ID`. Absence is accepted for providers that omit it.
+    #[serde(default)]
+    typ: Option<String>,
+    /// Present on OIDC ID tokens to bind them to the client's auth request.
+    #[serde(default)]
+    nonce: Option<Value>,
     /// Every claim not modelled above, including the configured tenant claim.
     #[serde(flatten)]
     extra: Map<String, Value>,

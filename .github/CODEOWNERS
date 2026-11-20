@@ -1,0 +1,8 @@
+# Default owner for everything in the repository.
+* @Surujkalita
+
+# Security-sensitive paths receive the same review attention.
+/.github/workflows/ @Surujkalita
+/services/rust-control-plane/src/auth/ @Surujkalita
+/services/rust-control-plane/src/broker/ @Surujkalita
+/services/rust-control-plane/src/runtime/ @Surujkalita

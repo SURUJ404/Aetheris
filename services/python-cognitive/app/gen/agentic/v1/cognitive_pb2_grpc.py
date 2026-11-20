@@ -51,6 +51,9 @@ class CognitiveServiceServicer(object):
 
     def Plan(self, request, context):
         """Rust sends bounded context and task metadata; Python returns a proposal.
+        Internal authentication is carried in gRPC metadata by the deployment
+        boundary (for example: authorization: Bearer <service-token>). The
+        metadata is transport authentication, not task authorization.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
