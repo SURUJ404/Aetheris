@@ -38,7 +38,7 @@ chrono = { version = "0.4.45", features = ["serde"] }
 opentelemetry = "0.27"
 opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.28"
-opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"] }
+opentelemetry-otlp = { version = "0.33", features = ["grpc-tonic"] }
 
 [build-dependencies]
 protoc-bin-vendored = "3"
