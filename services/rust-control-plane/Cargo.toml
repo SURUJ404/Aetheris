@@ -36,7 +36,7 @@ sha2 = "0.11.1"
 tokio-util = { version = "0.7.20", features = ["rt"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 opentelemetry = "0.27"
-opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+opentelemetry_sdk = { version = "0.33", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.28"
 opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"] }
 
