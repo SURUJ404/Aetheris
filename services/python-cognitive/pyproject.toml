@@ -17,7 +17,7 @@ dev = [
   "grpcio-tools>=1.74",
   "pytest>=8",
   "pytest-asyncio>=0.23",
-  "ruff>=0.3",
+  "ruff>=0.17.5",
   "mypy>=1.8"
 ]
 
